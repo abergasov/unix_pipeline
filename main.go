@@ -2,12 +2,15 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+const multiHashIterations = 6
 
 // multiHash struct for collect data in same order
 type multiHash struct {
@@ -43,12 +46,16 @@ func ExecutePipeline(jobs ...job) {
 func SingleHash(in, out chan interface{}) {
 	var wg sync.WaitGroup
 	for i := range in {
-		str := strconv.Itoa(i.(int))
+		val, ok := i.(int)
+		if !ok {
+			continue
+		}
+		str := strconv.Itoa(val)
 		md5 := DataSignerMd5(str)
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			wrapSingleHash(str, md5, out)
+			wg.Done()
 		}()
 	}
 	wg.Wait()
@@ -74,7 +81,10 @@ func wrapSingleHash(str, md5 string, res chan interface{}) {
 func MultiHash(in, out chan interface{}) {
 	var wg sync.WaitGroup
 	for i := range in {
-		str := i.(string)
+		str, ok := i.(string)
+		if !ok {
+			continue
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -85,8 +95,8 @@ func MultiHash(in, out chan interface{}) {
 }
 
 func calculateSingleMultiHash(calc string, res chan interface{}) {
-	ch := make(chan multiHash, 6)
-	for j := 0; j < 6; j++ {
+	ch := make(chan multiHash, multiHashIterations)
+	for j := 0; j < multiHashIterations; j++ {
 		go func(s string, c chan multiHash, counter int) {
 			c <- multiHash{
 				iteration: counter,
@@ -94,12 +104,12 @@ func calculateSingleMultiHash(calc string, res chan interface{}) {
 			}
 		}(calc, ch, j)
 	}
-	mHash := make([]string, 6, 6)
+	mHash := make([]string, multiHashIterations, multiHashIterations)
 	iteration := 0
 	for i := range ch {
 		mHash[i.iteration] = i.hash
 		iteration += 1
-		if iteration == 6 {
+		if iteration == multiHashIterations {
 			break
 		}
 	}
@@ -109,7 +119,10 @@ func calculateSingleMultiHash(calc string, res chan interface{}) {
 func CombineResults(in, out chan interface{}) {
 	var res []string
 	for i := range in {
-		str := i.(string)
+		str, ok := i.(string)
+		if !ok {
+			continue
+		}
 		res = append(res, str)
 	}
 	sort.Strings(res)
@@ -127,5 +140,13 @@ func main() {
 		SingleHash,
 		MultiHash,
 		CombineResults,
+		func(in, out chan interface{}) {
+			dataRaw := <-in
+			data, ok := dataRaw.(string)
+			if !ok {
+				log.Fatalln("result is not a string!")
+			}
+			fmt.Printf("final result is `%s`\n", data)
+		},
 	}...)
 }

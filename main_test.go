@@ -145,5 +145,4 @@ func TestSigner(t *testing.T) {
 		int(DataSignerCrc32Counter) != len(inputData)*8 {
 		t.Errorf("not enough hash-func calls")
 	}
-
 }

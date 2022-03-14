@@ -36,7 +36,7 @@ go test -v -race
 
 Do not use ```select```, ```context```, ```time.Sleep```
 
-Results for sending 2 values, (commented in tests):
+Example results for sending 2 values, (commented in tests):
 ```
 0 SingleHash data 0
 0 SingleHash md5(data) cfcd208495d565ef66e7dff9f98764da
